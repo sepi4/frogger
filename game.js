@@ -10,32 +10,39 @@ const CAR_WIDTH = 50;
 const CAR_HEIGHT = 40;
 const FPS = 60;
 
-// Frog
+// Frog (smaller)
 let frog = {
-    x: Math.floor(COLS / 2) * CELL_SIZE + 5,
-    y: (ROWS - 1) * CELL_SIZE + 5,
-    width: FROG_SIZE,
-    height: FROG_SIZE,
+    x: Math.floor(COLS / 2) * CELL_SIZE + 15,
+    y: (ROWS - 1) * CELL_SIZE + 15,
+    width: 20,
+    height: 20,
     color: 'lime',
 };
 
 // Cars (obstacles)
+const carColors = ['red', 'blue', 'orange', 'purple', 'yellow', 'cyan', 'magenta', 'green'];
 // Update lanes to match wider road
 const lanes = [2, 3, 4, 5, 6, 7, 8, 9]; // More lanes for wider road
 let cars = [];
 function spawnCars() {
     cars = [];
-    for (let lane of lanes) {
+    for (let laneIdx = 0; laneIdx < lanes.length; laneIdx++) {
+        let lane = lanes[laneIdx];
         let dir = lane % 2 === 0 ? 1 : -1;
-        for (let i = 0; i < 3; i++) {
+        let carSpacing = 180 + Math.random() * 40 - (level * 8); // less spacing as level increases
+        carSpacing = Math.max(carSpacing, 80); // minimum spacing
+        let carCount = Math.floor(canvas.width / carSpacing);
+        for (let i = 0; i < carCount; i++) {
+            let x = dir === 1 ? -i * carSpacing : canvas.width + i * carSpacing;
             cars.push({
-                x: dir === 1 ? -i * 200 : canvas.width + i * 200,
+                x: x,
                 y: lane * CELL_SIZE + 5,
                 width: CAR_WIDTH,
                 height: CAR_HEIGHT,
-                speed: 2 + Math.random() * 2,
+                speed: 2 + Math.random() * 2 + (level - 1) * 0.5, // increase speed per level
                 dir: dir,
-                color: 'red',
+                color: carColors[(laneIdx + i) % carColors.length],
+                lane: lane
             });
         }
     }
@@ -56,8 +63,19 @@ function moveFrog() {
 }
 
 function updateCars() {
-    for (let car of cars) {
-        car.x += car.speed * car.dir;
+    for (let i = 0; i < cars.length; i++) {
+        let car = cars[i];
+        // Prevent cars in the same lane from overlapping
+        let nextCar = cars.find(c => c.lane === car.lane && c !== car && ((car.dir === 1 && c.x > car.x) || (car.dir === -1 && c.x < car.x)));
+        let minGap = CAR_WIDTH + 20;
+        let canMove = true;
+        if (nextCar) {
+            if (car.dir === 1 && car.x + car.width + car.speed > nextCar.x) canMove = false;
+            if (car.dir === -1 && car.x - car.speed < nextCar.x + nextCar.width) canMove = false;
+        }
+        if (canMove) {
+            car.x += car.speed * car.dir;
+        }
         if (car.dir === 1 && car.x > canvas.width) car.x = -CAR_WIDTH;
         if (car.dir === -1 && car.x < -CAR_WIDTH) car.x = canvas.width;
     }
@@ -71,34 +89,36 @@ function checkCollision(a, b) {
 }
 
 function drawFrog() {
-    // Draw a simple frog shape (body, eyes, legs)
+    // Simple frog: green circle body, two white eyes, and small legs
     const centerX = frog.x + frog.width / 2;
     const centerY = frog.y + frog.height / 2;
-    // Body
-    ctx.fillStyle = 'lime';
+    // Legs (small lines)
+    ctx.strokeStyle = '#267c2b';
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.ellipse(centerX, centerY, frog.width/2, frog.height/2, 0, 0, Math.PI * 2);
+    // Back legs
+    ctx.moveTo(centerX - 7, centerY + 6); ctx.lineTo(centerX - 11, centerY + 12);
+    ctx.moveTo(centerX + 7, centerY + 6); ctx.lineTo(centerX + 11, centerY + 12);
+    // Front legs
+    ctx.moveTo(centerX - 7, centerY - 2); ctx.lineTo(centerX - 13, centerY - 6);
+    ctx.moveTo(centerX + 7, centerY - 2); ctx.lineTo(centerX + 13, centerY - 6);
+    ctx.stroke();
+    // Body
+    ctx.fillStyle = '#39c13f'; // Brighter green for frog
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, frog.width / 2, 0, Math.PI * 2);
     ctx.fill();
     // Eyes
     ctx.fillStyle = 'white';
     ctx.beginPath();
-    ctx.arc(centerX - 10, centerY - 12, 6, 0, Math.PI * 2);
-    ctx.arc(centerX + 10, centerY - 12, 6, 0, Math.PI * 2);
+    ctx.arc(centerX - 4, centerY - 6, 3, 0, Math.PI * 2);
+    ctx.arc(centerX + 4, centerY - 6, 3, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = 'black';
     ctx.beginPath();
-    ctx.arc(centerX - 10, centerY - 12, 2, 0, Math.PI * 2);
-    ctx.arc(centerX + 10, centerY - 12, 2, 0, Math.PI * 2);
+    ctx.arc(centerX - 4, centerY - 6, 1, 0, Math.PI * 2);
+    ctx.arc(centerX + 4, centerY - 6, 1, 0, Math.PI * 2);
     ctx.fill();
-    // Legs
-    ctx.strokeStyle = 'lime';
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.moveTo(centerX - 15, centerY + 15); ctx.lineTo(centerX - 25, centerY + 25);
-    ctx.moveTo(centerX + 15, centerY + 15); ctx.lineTo(centerX + 25, centerY + 25);
-    ctx.moveTo(centerX - 15, centerY - 5); ctx.lineTo(centerX - 25, centerY - 15);
-    ctx.moveTo(centerX + 15, centerY - 5); ctx.lineTo(centerX + 25, centerY - 15);
-    ctx.stroke();
 }
 
 function drawCars() {
@@ -120,13 +140,13 @@ function drawCars() {
 }
 
 function drawBackground() {
-    // Grass
-    ctx.fillStyle = '#228B22';
+    // Grass (darker)
+    ctx.fillStyle = '#1e7a2e';
     ctx.fillRect(0, 0, canvas.width, CELL_SIZE * 2);
     ctx.fillRect(0, (ROWS - 2) * CELL_SIZE, canvas.width, CELL_SIZE * 2);
     // Road (wider)
     ctx.fillStyle = '#444';
-    ctx.fillRect(0, CELL_SIZE * 2, canvas.width, CELL_SIZE * 8); // Make road 8 cells tall
+    ctx.fillRect(0, CELL_SIZE * 2, canvas.width, CELL_SIZE * 8);
 }
 
 function drawGoal() {
@@ -140,9 +160,31 @@ function drawGoal() {
 // Add lives
 let lives = 3;
 function drawLives() {
+    // Draw heart icons for lives
+    for (let i = 0; i < lives; i++) {
+        const x = 18 + i * 28;
+        const y = canvas.height - 28;
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(x + 7, y + 7);
+        ctx.bezierCurveTo(x + 7, y, x, y, x, y + 7);
+        ctx.bezierCurveTo(x, y + 12, x + 7, y + 15, x + 7, y + 20);
+        ctx.bezierCurveTo(x + 7, y + 15, x + 14, y + 12, x + 14, y + 7);
+        ctx.bezierCurveTo(x + 14, y, x + 7, y, x + 7, y + 7);
+        ctx.closePath();
+        ctx.fillStyle = 'red';
+        ctx.fill();
+        ctx.restore();
+    }
+}
+
+// LEVELS
+let level = 1;
+const maxLevel = 10;
+function drawLevel() {
     ctx.fillStyle = 'white';
     ctx.font = '24px Arial';
-    ctx.fillText('Lives: ' + lives, 10, canvas.height - 10);
+    ctx.fillText('Level: ' + level, canvas.width - 120, canvas.height - 10);
 }
 
 let gameOver = false;
@@ -152,8 +194,14 @@ function drawGameOver() {
     ctx.fillStyle = 'white';
     ctx.font = '48px Arial';
     ctx.fillText('Game Over', canvas.width / 2 - 120, canvas.height / 2);
-    ctx.font = '24px Arial';
-    ctx.fillText('Press R to Restart', canvas.width / 2 - 110, canvas.height / 2 + 40);
+    // Draw restart button
+    ctx.fillStyle = '#222';
+    ctx.fillRect(canvas.width / 2 - 80, canvas.height / 2 + 40, 160, 50);
+    ctx.strokeStyle = '#fff';
+    ctx.strokeRect(canvas.width / 2 - 80, canvas.height / 2 + 40, 160, 50);
+    ctx.fillStyle = 'white';
+    ctx.font = '28px Arial';
+    ctx.fillText('Restart', canvas.width / 2 - 45, canvas.height / 2 + 75);
 }
 
 function drawWin() {
@@ -161,15 +209,24 @@ function drawWin() {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = 'yellow';
     ctx.font = '48px Arial';
-    ctx.fillText('You Win!', canvas.width / 2 - 100, canvas.height / 2);
+    if (level < maxLevel) {
+        ctx.fillText('Level ' + level + ' Complete!', canvas.width / 2 - 170, canvas.height / 2);
+        ctx.font = '28px Arial';
+        ctx.fillText('Click to continue', canvas.width / 2 - 90, canvas.height / 2 + 50);
+    } else {
+        ctx.fillText('You Win!', canvas.width / 2 - 100, canvas.height / 2);
+    }
 }
 
 function resetGame(fullReset = false) {
-    frog.x = Math.floor(COLS / 2) * CELL_SIZE + 5;
-    frog.y = (ROWS - 1) * CELL_SIZE + 5;
+    frog.x = Math.floor(COLS / 2) * CELL_SIZE + 15;
+    frog.y = (ROWS - 1) * CELL_SIZE + 15;
+    if (fullReset) {
+        lives = 3;
+        level = 1;
+    }
     spawnCars();
     gameOver = false;
-    if (fullReset) lives = 3;
 }
 
 function gameLoop() {
@@ -179,7 +236,7 @@ function gameLoop() {
     drawCars();
     drawFrog();
     drawLives();
-
+    drawLevel();
     if (!gameOver) {
         moveFrog();
         updateCars();
@@ -187,8 +244,8 @@ function gameLoop() {
             if (checkCollision(frog, car)) {
                 lives--;
                 if (lives > 0) {
-                    frog.x = Math.floor(COLS / 2) * CELL_SIZE + 5;
-                    frog.y = (ROWS - 1) * CELL_SIZE + 5;
+                    frog.x = Math.floor(COLS / 2) * CELL_SIZE + 15;
+                    frog.y = (ROWS - 1) * CELL_SIZE + 15;
                 } else {
                     gameOver = true;
                 }
@@ -196,13 +253,22 @@ function gameLoop() {
             }
         }
         if (frog.y < CELL_SIZE) {
-            drawWin();
-            setTimeout(() => resetGame(true), 2000);
-            return;
+            if (level < maxLevel) {
+                level++;
+                frog.x = Math.floor(COLS / 2) * CELL_SIZE + 15;
+                frog.y = (ROWS - 1) * CELL_SIZE + 15;
+                spawnCars();
+                setTimeout(gameLoop, 500);
+                drawWin();
+                return;
+            } else {
+                drawWin();
+                setTimeout(() => resetGame(true), 2500);
+                return;
+            }
         }
     } else {
         drawGameOver();
-        // Wait for R key to restart
         return;
     }
     requestAnimationFrame(gameLoop);
@@ -212,6 +278,27 @@ document.addEventListener('keydown', function(e) {
     if (gameOver && (e.key === 'r' || e.key === 'R')) {
         resetGame(true);
         gameLoop();
+    }
+});
+
+canvas.addEventListener('click', function(e) {
+    if (gameOver) {
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+        if (
+            mx >= canvas.width / 2 - 80 && mx <= canvas.width / 2 + 80 &&
+            my >= canvas.height / 2 + 40 && my <= canvas.height / 2 + 90
+        ) {
+            resetGame(true);
+            gameLoop();
+        }
+    } else if (frog.y < CELL_SIZE && level < maxLevel) {
+        // Advance to next level on click after win
+        frog.x = Math.floor(COLS / 2) * CELL_SIZE + 15;
+        frog.y = (ROWS - 1) * CELL_SIZE + 15;
+        spawnCars();
+        setTimeout(gameLoop, 200);
     }
 });
 
