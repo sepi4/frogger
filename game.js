@@ -29,7 +29,13 @@ function spawnCars() {
     for (let laneIdx = 0; laneIdx < lanes.length; laneIdx++) {
         let lane = lanes[laneIdx];
         let dir = lane % 2 === 0 ? 1 : -1;
-        let carSpacing = 180 + Math.random() * 40 - (level * 8); // less spacing as level increases
+        // Make level 1 very easy: slow cars, few cars, wide spacing
+        let baseSpeed = 1.2; // much slower base speed
+        let speedIncrease = 0.35 * (level - 1); // gradual increase
+        let laneSpeed = baseSpeed + speedIncrease + Math.random() * 0.5;
+        let baseSpacing = 260; // much wider spacing at level 1
+        let spacingDecrease = 18 * (level - 1); // decrease spacing per level
+        let carSpacing = baseSpacing - spacingDecrease + Math.random() * 30;
         carSpacing = Math.max(carSpacing, 80); // minimum spacing
         let carCount = Math.floor(canvas.width / carSpacing);
         for (let i = 0; i < carCount; i++) {
@@ -39,7 +45,7 @@ function spawnCars() {
                 y: lane * CELL_SIZE + 5,
                 width: CAR_WIDTH,
                 height: CAR_HEIGHT,
-                speed: 2 + Math.random() * 2 + (level - 1) * 0.5, // increase speed per level
+                speed: laneSpeed, // all cars in this lane have the same speed
                 dir: dir,
                 color: carColors[(laneIdx + i) % carColors.length],
                 lane: lane
@@ -57,7 +63,19 @@ function moveFrog() {
     if (keys['ArrowUp'] && frog.y > 0) frog.y -= CELL_SIZE;
     if (keys['ArrowDown'] && frog.y < (ROWS - 1) * CELL_SIZE) frog.y += CELL_SIZE;
     if (keys['ArrowLeft'] && frog.x > 0) frog.x -= CELL_SIZE;
-    if (keys['ArrowRight'] && frog.x < (COLS - 1) * CELL_SIZE) frog.x += CELL_SIZE;
+    if (keys['ArrowRight'] && frog.x < canvas.width - frog.width) frog.x += CELL_SIZE;
+    // Clamp frog.x to stay within the board (allow exactly 0 and rightmost pixel)
+    if (frog.x < 0) frog.x = 0;
+    if (frog.x > canvas.width - frog.width) frog.x = canvas.width - frog.width;
+    // Clamp frog.y to stay within the board
+    if (frog.y < 0) frog.y = 0;
+    if (frog.y > (ROWS - 1) * CELL_SIZE) frog.y = (ROWS - 1) * CELL_SIZE;
+    // Align frog vertically with cars if in a car lane
+    const laneIdx = lanes.findIndex(lane => frog.y >= lane * CELL_SIZE && frog.y < (lane + 1) * CELL_SIZE);
+    if (laneIdx !== -1) {
+        // Center frog in the lane vertically, matching car vertical alignment
+        frog.y = lanes[laneIdx] * CELL_SIZE + 5 + (CAR_HEIGHT - frog.height) / 2;
+    }
     // Prevent holding key for continuous move
     keys = {};
 }
@@ -88,18 +106,24 @@ function checkCollision(a, b) {
            a.y + a.height > b.y;
 }
 
+let hitBlink = false;
+let hitBlinkTime = 0;
+let bloodFrog = false;
+let bloodSplatPositions = [];
+
 function drawFrog() {
-    // Simple frog: green circle body, two white eyes, and small legs
     const centerX = frog.x + frog.width / 2;
     const centerY = frog.y + frog.height / 2;
-    // Legs (small lines)
-    ctx.strokeStyle = '#267c2b';
+    if (bloodFrog) {
+        // Draw a red splat for blood frog (drawn in gameLoop under cars)
+        return;
+    }
+    // Legs (same color as body)
+    ctx.strokeStyle = '#39c13f';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    // Back legs
     ctx.moveTo(centerX - 7, centerY + 6); ctx.lineTo(centerX - 11, centerY + 12);
     ctx.moveTo(centerX + 7, centerY + 6); ctx.lineTo(centerX + 11, centerY + 12);
-    // Front legs
     ctx.moveTo(centerX - 7, centerY - 2); ctx.lineTo(centerX - 13, centerY - 6);
     ctx.moveTo(centerX + 7, centerY - 2); ctx.lineTo(centerX + 13, centerY - 6);
     ctx.stroke();
@@ -119,6 +143,27 @@ function drawFrog() {
     ctx.arc(centerX - 4, centerY - 6, 1, 0, Math.PI * 2);
     ctx.arc(centerX + 4, centerY - 6, 1, 0, Math.PI * 2);
     ctx.fill();
+}
+
+function drawBloodSplat() {
+    // Draw all blood splats for every hit, with a more splashy/irregular look
+    ctx.save();
+    ctx.globalAlpha = 0.85;
+    ctx.fillStyle = '#b30000';
+    for (const pos of bloodSplatPositions) {
+        ctx.beginPath();
+        // Main splat (irregular ellipse)
+        ctx.ellipse(pos.x, pos.y, 13, 8, Math.PI/8, 0, Math.PI*2);
+        // Droplets and irregularities
+        ctx.ellipse(pos.x + 10, pos.y - 4, 4, 2, Math.PI/6, 0, Math.PI*2);
+        ctx.ellipse(pos.x - 10, pos.y + 3, 3, 2, -Math.PI/7, 0, Math.PI*2);
+        ctx.ellipse(pos.x + 6, pos.y + 8, 2.5, 2, Math.PI/3, 0, Math.PI*2);
+        ctx.ellipse(pos.x - 7, pos.y - 7, 2.5, 2, -Math.PI/3, 0, Math.PI*2);
+        ctx.ellipse(pos.x + 2, pos.y - 11, 2, 1.5, Math.PI/2, 0, Math.PI*2);
+        ctx.ellipse(pos.x - 2, pos.y + 12, 2, 1.5, -Math.PI/2, 0, Math.PI*2);
+        ctx.fill();
+    }
+    ctx.restore();
 }
 
 function drawCars() {
@@ -150,9 +195,22 @@ function drawBackground() {
 }
 
 function drawGoal() {
-    ctx.fillStyle = 'yellow';
+    // Draw a river background for the goal area
+    ctx.fillStyle = '#3ac6f7'; // River blue
     ctx.fillRect(0, 0, canvas.width, CELL_SIZE);
-    ctx.fillStyle = 'black';
+    // Add some wavy lines for water effect
+    for (let i = 0; i < 5; i++) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        let y = 10 + i * 8;
+        for (let x = 0; x < canvas.width; x += 20) {
+            ctx.lineTo(x + 10, y + Math.sin((x + i * 30) / 18) * 3);
+        }
+        ctx.stroke();
+    }
+    // Draw the GOAL text
+    ctx.fillStyle = 'navy';
     ctx.font = '24px Arial';
     ctx.fillText('GOAL', canvas.width / 2 - 35, CELL_SIZE / 1.5);
 }
@@ -184,7 +242,7 @@ const maxLevel = 10;
 function drawLevel() {
     ctx.fillStyle = 'white';
     ctx.font = '24px Arial';
-    ctx.fillText('Level: ' + level, canvas.width - 120, canvas.height - 10);
+    ctx.fillText('Level: ' + level + ' / ' + maxLevel, canvas.width - 170, canvas.height - 10);
 }
 
 let gameOver = false;
@@ -224,15 +282,150 @@ function resetGame(fullReset = false) {
     if (fullReset) {
         lives = 3;
         level = 1;
+        bloodSplatPositions = [];
     }
     spawnCars();
     gameOver = false;
 }
 
+let frogHeaven = false;
+let flies = [];
+
+function startFrogHeaven() {
+    frogHeaven = true;
+    flies = [];
+    // Place frog on a lilypad in the river (goal area)
+    frog.x = canvas.width / 2 - frog.width / 2;
+    frog.y = CELL_SIZE / 2 - frog.height / 2 + 8;
+    // Spawn flies
+    for (let i = 0; i < 18; i++) {
+        flies.push({
+            x: Math.random() * canvas.width,
+            y: Math.random() * (CELL_SIZE - 20) + 10,
+            angle: Math.random() * Math.PI * 2,
+            speed: 1.2 + Math.random() * 0.8,
+            radius: 60 + Math.random() * 60,
+            avoid: false
+        });
+    }
+}
+
+function updateFlies() {
+    for (let fly of flies) {
+        // Vector from fly to frog
+        let dx = fly.x - (frog.x + frog.width / 2);
+        let dy = fly.y - (frog.y + frog.height / 2);
+        let dist = Math.sqrt(dx * dx + dy * dy);
+        // If too close to frog, steer away
+        if (dist < 50) {
+            fly.angle += (Math.atan2(dy, dx) + Math.PI - fly.angle) * 0.2;
+            fly.avoid = true;
+        } else {
+            fly.angle += (Math.random() - 0.5) * 0.2;
+            fly.avoid = false;
+        }
+        fly.x += Math.cos(fly.angle) * fly.speed;
+        fly.y += Math.sin(fly.angle) * fly.speed;
+        // Stay in river area
+        if (fly.x < 10) fly.x = 10;
+        if (fly.x > canvas.width - 10) fly.x = canvas.width - 10;
+        if (fly.y < 10) fly.y = 10;
+        if (fly.y > CELL_SIZE - 10) fly.y = CELL_SIZE - 10;
+    }
+}
+
+function drawFrogHeaven() {
+    // Draw river background
+    ctx.fillStyle = '#3ac6f7';
+    ctx.fillRect(0, 0, canvas.width, CELL_SIZE);
+    // Wavy water lines
+    for (let i = 0; i < 5; i++) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        let y = 10 + i * 8;
+        for (let x = 0; x < canvas.width; x += 20) {
+            ctx.lineTo(x + 10, y + Math.sin((x + i * 30) / 18) * 3);
+        }
+        ctx.stroke();
+    }
+    // Draw lilypad
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(canvas.width / 2, CELL_SIZE / 2 + 8, 38, 18, 0, 0, Math.PI * 2);
+    ctx.fillStyle = '#6adf6a';
+    ctx.shadowColor = '#2e7a2e';
+    ctx.shadowBlur = 8;
+    ctx.fill();
+    ctx.restore();
+    // Draw frog on lilypad
+    drawFrog();
+    // Draw flies
+    for (let fly of flies) {
+        ctx.save();
+        ctx.translate(fly.x, fly.y);
+        // Body
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 4, 2.5, 0, 0, Math.PI * 2);
+        ctx.fillStyle = '#222';
+        ctx.fill();
+        // Wings
+        ctx.globalAlpha = 0.5;
+        ctx.beginPath();
+        ctx.ellipse(-2, -2, 3, 1.5, -0.5, 0, Math.PI * 2);
+        ctx.ellipse(2, -2, 3, 1.5, 0.5, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+        ctx.globalAlpha = 1.0;
+        ctx.restore();
+    }
+    // Heaven text
+    ctx.fillStyle = 'gold';
+    ctx.font = '38px Arial';
+    ctx.fillText('Frog Heaven', canvas.width / 2 - 110, CELL_SIZE - 10);
+    ctx.font = '20px Arial';
+    ctx.fillStyle = 'white';
+    ctx.fillText('So many flies!', canvas.width / 2 - 60, CELL_SIZE + 18);
+}
+
 function gameLoop() {
+    if (frogHeaven) {
+        updateFlies();
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawFrogHeaven();
+        requestAnimationFrame(gameLoop);
+        return;
+    }
+    if (hitBlink) {
+        updateCars();
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawBackground();
+        drawGoal();
+        drawBloodSplat();
+        drawCars();
+        drawLives();
+        drawLevel();
+        if (Math.floor(Date.now() / 100) % 2 === 0) {
+            ctx.fillStyle = 'white';
+            ctx.globalAlpha = 0.5;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.globalAlpha = 1.0;
+        }
+        if (Date.now() - hitBlinkTime > 1200) {
+            hitBlink = false;
+            bloodFrog = false;
+            if (lives > 0) {
+                frog.x = Math.floor(COLS / 2) * CELL_SIZE + 15;
+                frog.y = (ROWS - 1) * CELL_SIZE + 15;
+            }
+        }
+        requestAnimationFrame(gameLoop);
+        return;
+    }
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawBackground();
     drawGoal();
+    drawBloodSplat();
     drawCars();
     drawFrog();
     drawLives();
@@ -243,13 +436,15 @@ function gameLoop() {
         for (let car of cars) {
             if (checkCollision(frog, car)) {
                 lives--;
-                if (lives > 0) {
-                    frog.x = Math.floor(COLS / 2) * CELL_SIZE + 15;
-                    frog.y = (ROWS - 1) * CELL_SIZE + 15;
-                } else {
-                    gameOver = true;
+                bloodFrog = true;
+                hitBlink = true;
+                hitBlinkTime = Date.now();
+                bloodSplatPositions.push({ x: frog.x + frog.width / 2, y: frog.y + frog.height / 2 });
+                if (lives <= 0) {
+                    setTimeout(() => { gameOver = true; }, 1200);
                 }
-                break;
+                requestAnimationFrame(gameLoop);
+                return;
             }
         }
         if (frog.y < CELL_SIZE) {
@@ -262,8 +457,8 @@ function gameLoop() {
                 drawWin();
                 return;
             } else {
-                drawWin();
-                setTimeout(() => resetGame(true), 2500);
+                // Instead of drawWin and reset, go to frog heaven
+                setTimeout(startFrogHeaven, 800);
                 return;
             }
         }
