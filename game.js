@@ -89,19 +89,20 @@ function moveFrog() {
     keys = {};
 }
 
-function updateCars() {
+function updateCars(deltaTime) {
     for (let i = 0; i < cars.length; i++) {
         let car = cars[i];
         // Prevent cars in the same lane from overlapping
         let nextCar = cars.find(c => c.lane === car.lane && c !== car && ((car.dir === 1 && c.x > car.x) || (car.dir === -1 && c.x < car.x)));
         let minGap = CAR_WIDTH + 20;
         let canMove = true;
+        let moveAmount = car.speed * car.dir * (deltaTime / 16.67); // 16.67ms = 60 FPS
         if (nextCar) {
-            if (car.dir === 1 && car.x + car.width + car.speed > nextCar.x) canMove = false;
-            if (car.dir === -1 && car.x - car.speed < nextCar.x + nextCar.width) canMove = false;
+            if (car.dir === 1 && car.x + car.width + moveAmount > nextCar.x) canMove = false;
+            if (car.dir === -1 && car.x - moveAmount < nextCar.x + nextCar.width) canMove = false;
         }
         if (canMove) {
-            car.x += car.speed * car.dir;
+            car.x += moveAmount;
         }
         if (car.dir === 1 && car.x > canvas.width) car.x = -CAR_WIDTH;
         if (car.dir === -1 && car.x < -CAR_WIDTH) car.x = canvas.width;
@@ -319,7 +320,7 @@ function startFrogHeaven() {
     }
 }
 
-function updateFlies() {
+function updateFlies(deltaTime) {
     for (let fly of flies) {
         // Vector from fly to frog
         let dx = fly.x - (frog.x + frog.width / 2);
@@ -333,8 +334,9 @@ function updateFlies() {
             fly.angle += (Math.random() - 0.5) * 0.2;
             fly.avoid = false;
         }
-        fly.x += Math.cos(fly.angle) * fly.speed;
-        fly.y += Math.sin(fly.angle) * fly.speed;
+        let moveAmount = fly.speed * (deltaTime / 16.67);
+        fly.x += Math.cos(fly.angle) * moveAmount;
+        fly.y += Math.sin(fly.angle) * moveAmount;
         // Stay in river area
         if (fly.x < 10) fly.x = 10;
         if (fly.x > canvas.width - 10) fly.x = canvas.width - 10;
@@ -397,16 +399,22 @@ function drawFrogHeaven() {
     ctx.fillText('So many flies!', canvas.width / 2 - 60, CELL_SIZE + 18);
 }
 
-function gameLoop() {
+let lastTimestamp = null;
+
+function gameLoop(timestamp) {
+    if (!lastTimestamp) lastTimestamp = timestamp;
+    let deltaTime = timestamp - lastTimestamp;
+    if (deltaTime > 100) deltaTime = 100; // clamp for tab switching/lag
     if (frogHeaven) {
-        updateFlies();
+        updateFlies(deltaTime);
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         drawFrogHeaven();
+        lastTimestamp = timestamp;
         requestAnimationFrame(gameLoop);
         return;
     }
     if (hitBlink) {
-        updateCars();
+        updateCars(deltaTime);
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         drawBackground();
         drawGoal();
@@ -428,6 +436,7 @@ function gameLoop() {
                 frog.y = (ROWS - 1) * CELL_SIZE + 15;
             }
         }
+        lastTimestamp = timestamp;
         requestAnimationFrame(gameLoop);
         return;
     }
@@ -441,7 +450,7 @@ function gameLoop() {
     drawLevel();
     if (!gameOver) {
         moveFrog();
-        updateCars();
+        updateCars(deltaTime);
         for (let car of cars) {
             if (checkCollision(frog, car)) {
                 lives--;
@@ -452,6 +461,7 @@ function gameLoop() {
                 if (lives <= 0) {
                     setTimeout(() => { gameOver = true; }, 1200);
                 }
+                lastTimestamp = timestamp;
                 requestAnimationFrame(gameLoop);
                 return;
             }
@@ -462,12 +472,11 @@ function gameLoop() {
                 frog.x = Math.floor(COLS / 2) * CELL_SIZE + 15;
                 frog.y = (ROWS - 1) * CELL_SIZE + 15;
                 spawnCars();
-                setTimeout(gameLoop, 500);
+                setTimeout(() => { lastTimestamp = null; requestAnimationFrame(gameLoop); }, 500);
                 drawWin();
                 return;
             } else {
-                // Instead of drawWin and reset, go to frog heaven
-                setTimeout(startFrogHeaven, 800);
+                setTimeout(() => { startFrogHeaven(); lastTimestamp = null; requestAnimationFrame(gameLoop); }, 800);
                 return;
             }
         }
@@ -475,6 +484,7 @@ function gameLoop() {
         drawGameOver();
         return;
     }
+    lastTimestamp = timestamp;
     requestAnimationFrame(gameLoop);
 }
 
@@ -507,4 +517,4 @@ canvas.addEventListener('click', function(e) {
 });
 
 spawnCars();
-gameLoop();
+requestAnimationFrame(gameLoop);
