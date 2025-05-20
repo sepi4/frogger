@@ -2,15 +2,73 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
     <title>Frogger Game</title>
     <style>
         body { background: #222; display: flex; justify-content: center; align-items: center; height: 100vh; }
         canvas { background: #333; display: block; margin: 0 auto; border: 2px solid #0f0; }
+        /* Responsive canvas for mobile */
+        @media (max-width: 900px) {
+            #gameCanvas {
+                width: 100vw !important;
+                max-width: 100vw !important;
+                height: auto !important;
+                max-height: 80vh;
+                display: block;
+            }
+            body {
+                align-items: flex-start;
+                height: 100dvh;
+            }
+            #mobile-controls { display: block !important; }
+        }
+        @media (min-width: 901px) {
+            #mobile-controls { display: none !important; }
+        }
+        .arrow-btn {
+            width: 64px;
+            height: 64px;
+            font-size: 2.5rem;
+            margin: 8px;
+            border-radius: 50%;
+            border: none;
+            background: transparent;
+            color: #fff;
+            box-shadow: none;
+            transition: background 0.2s;
+            padding: 0;
+        }
+        .arrow-btn:active {
+            background: rgba(255,255,255,0.12);
+        }
     </style>
 </head>
 <body>
     <canvas id="gameCanvas" width="500" height="600"></canvas>
+    <!-- Mobile controls: only visible on mobile, styled as T-shape, below the game board -->
+    <div id="mobile-controls" style="display:none; position:fixed; left:0; right:0; bottom:18px; z-index:10; text-align:center;">
+        <div style="height:0.5em;"></div>
+        <button id="btn-up" class="arrow-btn">⬆️</button>
+        <div>
+            <button id="btn-left" class="arrow-btn">⬅️</button>
+            <button id="btn-down" class="arrow-btn">⬇️</button>
+            <button id="btn-right" class="arrow-btn">➡️</button>
+        </div>
+    </div>
+    <script>
+    // Show/hide mobile controls based on device
+    function isMobile() {
+        return /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|Mobile/i.test(navigator.userAgent);
+    }
+    window.addEventListener('DOMContentLoaded', function() {
+        var controls = document.getElementById('mobile-controls');
+        if (isMobile()) {
+            controls.style.display = 'block';
+        } else {
+            controls.style.display = 'none';
+        }
+    });
+    </script>
     <script src="game.js"></script>
 </body>
 </html>

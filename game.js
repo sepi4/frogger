@@ -59,6 +59,15 @@ let keys = {};
 document.addEventListener('keydown', e => keys[e.key] = true);
 document.addEventListener('keyup', e => keys[e.key] = false);
 
+document.getElementById('btn-up').addEventListener('touchstart', e => { keys['ArrowUp'] = true; moveFrog(); });
+document.getElementById('btn-down').addEventListener('touchstart', e => { keys['ArrowDown'] = true; moveFrog(); });
+document.getElementById('btn-left').addEventListener('touchstart', e => { keys['ArrowLeft'] = true; moveFrog(); });
+document.getElementById('btn-right').addEventListener('touchstart', e => { keys['ArrowRight'] = true; moveFrog(); });
+// Prevent continuous move on hold
+['btn-up','btn-down','btn-left','btn-right'].forEach(id => {
+  document.getElementById(id).addEventListener('touchend', e => { keys = {}; });
+});
+
 function moveFrog() {
     if (keys['ArrowUp'] && frog.y > 0) frog.y -= CELL_SIZE;
     if (keys['ArrowDown'] && frog.y < (ROWS - 1) * CELL_SIZE) frog.y += CELL_SIZE;
