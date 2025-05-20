@@ -41,9 +41,29 @@
         .arrow-btn:active {
             background: rgba(255,255,255,0.12);
         }
+        .resize-btn {
+            width: 32px;
+            height: 32px;
+            font-size: 1.2rem;
+            border-radius: 50%;
+            border: none;
+            background: rgba(0,0,0,0.25);
+            color: #fff;
+            position: absolute;
+            z-index: 20;
+            pointer-events: auto;
+        }
+        #btn-size-minus { left: 10px; top: 10px; }
+        #btn-size-plus { right: 10px; top: 10px; }
+        @media (min-width: 901px) {
+            .resize-btn { display: none !important; }
+        }
     </style>
 </head>
 <body>
+    <!-- Small plus and minus buttons for resizing movement buttons (mobile only) -->
+    <button id="btn-size-minus" class="resize-btn" style="display:none; left:10px; top:10px;">−</button>
+    <button id="btn-size-plus" class="resize-btn" style="display:none; right:10px; top:10px;">＋</button>
     <canvas id="gameCanvas" width="500" height="600"></canvas>
     <!-- Mobile controls: split left/right for Abaton layout -->
     <div id="mobile-controls" style="display:none; position:fixed; left:0; right:0; bottom:18px; z-index:10; width:100vw; pointer-events:none;">
@@ -60,6 +80,73 @@
             </div>
         </div>
     </div>
+    <script>
+    // Show/hide mobile controls and resize buttons based on device
+    function isMobile() {
+        return /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|Mobile/i.test(navigator.userAgent);
+    }
+    function setMobileVisibility() {
+        var controls = document.getElementById('mobile-controls');
+        var plusBtn = document.getElementById('btn-size-plus');
+        var minusBtn = document.getElementById('btn-size-minus');
+        if (isMobile()) {
+            controls.style.display = 'block';
+            plusBtn.style.display = 'block';
+            minusBtn.style.display = 'block';
+        } else {
+            controls.style.display = 'none';
+            plusBtn.style.display = 'none';
+            minusBtn.style.display = 'none';
+        }
+    }
+    window.addEventListener('DOMContentLoaded', setMobileVisibility);
+    window.addEventListener('resize', setMobileVisibility);
+
+    // Movement button resizing logic with localStorage persistence
+    let btnSize = 90;
+    // Load saved size if available
+    if (localStorage.getItem('froggerBtnSize')) {
+        btnSize = parseInt(localStorage.getItem('froggerBtnSize'), 10);
+    }
+    function updateBtnSize() {
+        let btns = document.querySelectorAll('.arrow-btn');
+        btns.forEach(btn => {
+            btn.style.width = btnSize + 'px';
+            btn.style.height = btnSize + 'px';
+            btn.style.fontSize = (btnSize * 0.039) + 'rem';
+        });
+        // Save to localStorage
+        localStorage.setItem('froggerBtnSize', btnSize);
+    }
+    document.getElementById('btn-size-plus').addEventListener('click', function(e) {
+        btnSize = Math.min(btnSize + 18, 160);
+        updateBtnSize();
+    });
+    document.getElementById('btn-size-minus').addEventListener('click', function(e) {
+        btnSize = Math.max(btnSize - 18, 44);
+        updateBtnSize();
+    });
+    // Initialize size on load
+    window.addEventListener('DOMContentLoaded', updateBtnSize);
+
+    // Make restart button work for mobile (touch/click)
+    document.getElementById('gameCanvas').addEventListener('touchstart', function(e) {
+        if (typeof gameOver !== 'undefined' && gameOver) {
+            const rect = gameCanvas.getBoundingClientRect();
+            const mx = (e.touches[0].clientX - rect.left);
+            const my = (e.touches[0].clientY - rect.top);
+            if (
+                mx >= gameCanvas.width / 2 - 80 && mx <= gameCanvas.width / 2 + 80 &&
+                my >= gameCanvas.height / 2 + 40 && my <= gameCanvas.height / 2 + 90
+            ) {
+                if (typeof resetGame === 'function') {
+                    resetGame(true);
+                    if (typeof gameLoop === 'function') gameLoop();
+                }
+            }
+        }
+    });
+    </script>
     <script>
     // Show/hide mobile controls based on device
     function isMobile() {
