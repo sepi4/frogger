@@ -133,15 +133,19 @@
     document.getElementById('gameCanvas').addEventListener('touchstart', function(e) {
         if (typeof gameOver !== 'undefined' && gameOver) {
             const rect = gameCanvas.getBoundingClientRect();
-            const mx = (e.touches[0].clientX - rect.left);
-            const my = (e.touches[0].clientY - rect.top);
+            const mx = (e.touches[0].clientX - rect.left) * (gameCanvas.width / rect.width);
+            const my = (e.touches[0].clientY - rect.top) * (gameCanvas.height / rect.height);
             if (
                 mx >= gameCanvas.width / 2 - 80 && mx <= gameCanvas.width / 2 + 80 &&
                 my >= gameCanvas.height / 2 + 40 && my <= gameCanvas.height / 2 + 90
             ) {
                 if (typeof resetGame === 'function') {
                     resetGame(true);
-                    if (typeof gameLoop === 'function') gameLoop();
+                    // Use requestAnimationFrame to restart the game loop, just like initial start
+                    if (typeof gameLoop === 'function') {
+                        window.lastTimestamp = null; // ensure fresh start
+                        requestAnimationFrame(gameLoop);
+                    }
                 }
             }
         }
